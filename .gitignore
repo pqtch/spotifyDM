@@ -3,4 +3,8 @@ CS4631FinalProject.pdf
 DataPreprocessing_1 (2).ipynb
 DataPreprocessing_2 (1).ipynb
 FinalCheckList.pdf
-Report.pdf
+Report.pdf*.csv
+.venv/
+__pycache__/
+uv.lock
+.python-version

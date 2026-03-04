@@ -8,3 +8,4 @@ Report.pdf*.csv
 __pycache__/
 uv.lock
 .python-version
+Report.pdf

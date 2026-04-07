@@ -1,11 +1,19 @@
+# Data
+data/
+*.csv
+
+# PDFs / Docs
 CISC4631SyllabusSpring26.pdf
 CS4631FinalProject.pdf
-DataPreprocessing_1 (2).ipynb
-DataPreprocessing_2 (1).ipynb
 FinalCheckList.pdf
-Report.pdf*.csv
+Report.pdf
+
+# Python
 .venv/
 __pycache__/
+*.pyc
 uv.lock
 .python-version
-Report.pdf
+
+# Jupyter
+.ipynb_checkpoints/

@@ -1,0 +1,195 @@
+# Spotify Data Mining — Project Briefing
+**CISC 4631 | Group 3 | Updated 2026-04-14**
+
+---
+
+## The Big Picture
+
+We have a dataset of **550,000 Spotify songs** with audio measurements for each song (how danceable it is, how loud, how fast, etc.) plus a popularity score from 0–100. The project asks: **can a computer learn patterns in those audio measurements well enough to predict genre or popularity?**
+
+We split the work into three notebooks that run in order.
+
+---
+
+## Notebook 00 — `00_data_setup.ipynb`
+### "The Kitchen"
+
+**What it does:** Loads the raw data, explores it, cleans it up, and saves two ready-to-use datasets to Google Drive. The other two notebooks pull from those saved files — they never touch the raw 550k-row dataset.
+
+### Step by step
+
+**1. Load**
+Two files come from Kaggle:
+- `artists.csv` — one row per artist, with follower count and popularity
+- `songs.csv` — one row per song, with 10 audio measurements + genre + year + popularity
+
+We call these `dfA` (artists) and `dfS` (songs) throughout.
+
+**2. Genre consolidation**
+The original dataset had 10 genres, several of which overlap heavily in sound. We merged similar ones:
+
+| Original | Merged into |
+|----------|-------------|
+| Hip-Hop + R&B | Hip-Hop/R&B |
+| Country + Folk | Country/Folk |
+| Jazz + Blues | Jazz/Blues |
+
+This leaves **7 genres** total. Merging makes sense because audio features can't reliably distinguish, say, a Folk song from a Country song — they sound nearly identical to a computer.
+
+**3. Artist EDA (Exploratory Data Analysis)**
+We look at the artist data before touching songs:
+- Distribution of follower counts (extremely skewed — a few artists have billions of followers)
+- Popularity by genre
+- **Artist segmentation:** we split every artist into one of four quadrants based on followers vs. popularity:
+  - **Mainstream Giant** — high followers, high popularity (think Taylor Swift)
+  - **Rising Star** — low followers, high popularity (buzzing but not huge yet)
+  - **Fading Icon** — high followers, low popularity (legacy artists whose streams have dried up)
+  - **Underground Gem** — low followers, low popularity (niche, cult artists)
+
+**4. Song EDA**
+Nine sections of exploration on the songs:
+- Popularity is heavily skewed — most songs sit near 0. About 40% have popularity ≤ 5.
+- Songs per year shows exponential growth peaking around 2020.
+- Rock dominates at ~35% of all songs — way more than any other genre.
+- Audio features have very weak linear correlation with popularity (none above 0.15). This tells us we'll need non-linear models.
+- Feature–popularity relationships differ by genre — danceability predicts popularity in Hip-Hop but barely matters in Classical.
+
+**5. Year filter**
+We keep only songs from **2000 onward**. Spotify's popularity score is based on recent streaming activity, so pre-2000 songs are systematically underscored — not because they're bad, but because fewer people stream them today.
+
+**6. Export Dataset A — for genre classification**
+- Drop Rock (it's 35% of the data; keeping it would overwhelm the classifier)
+- Take up to **5,000 songs per genre** (randomly sampled) so no genre dominates
+- Save as `df_genre_balanced.csv` → used by Notebook 01
+
+**7. Export Dataset B — for popularity prediction**
+- Assign each song a **global popularity class**: Low (score ≤ 20), Mid (21–45), High (≥ 46)
+- Assign each song a **genre-relative popularity class**: compare the song only to other songs in its genre — a Classical song at 30 is a standout; a Pop song at 30 is average
+- Take **500 songs per (class × genre) combination** so classes are balanced
+- Save as `df_popularity_stratified.csv` → used by Notebook 02
+
+---
+
+## Notebook 01 — `01_genre_classification.ipynb`
+### "Can audio features predict genre?"
+
+**Research Question:** If I give a computer the audio measurements of a song — but don't tell it the genre — can it figure out what genre it is?
+
+**What it loads:** `df_genre_balanced.csv` (the balanced 6-genre dataset from Notebook 00)
+
+**The features:** The 12 audio measurements we feed the model:
+`danceability, energy, loudness, speechiness, acousticness, instrumentalness, liveness, valence, tempo, duration_ms, key, mode`
+
+**The split:** 80% of songs go to training (the model learns from these), 20% go to testing (the model has never seen these — we use them to grade it).
+
+### The two models
+
+**Model 1 — Logistic Regression (baseline)**
+- Think of this as drawing straight lines to divide genres in the feature space
+- It's the "simple" model — we use it as a floor to beat
+- Includes StandardScaler (automatically normalizes all features to the same scale before training)
+- Also runs **10-fold cross-validation**: splits the data 10 different ways and averages the accuracy — gives a more reliable score than a single test
+
+**Model 2 — Random Forest**
+- Builds 100 decision trees, each trained on a random subset of songs and features
+- Each tree votes, and the majority wins — this is called ensemble learning
+- Much better at capturing non-linear relationships (genre boundaries aren't straight lines)
+- Also runs 10-fold cross-validation
+
+### What we report
+- Accuracy + classification report for each model on the test set
+- Cross-validation score in class format: `CV Accuracy: 0.XX (+/- 0.XX)`
+- Side-by-side bar chart of Accuracy, Macro F1, Weighted F1
+- Random Forest feature importance chart (which audio features mattered most?)
+- Random Forest confusion matrix (which genres get mixed up?)
+
+### What we expect to find
+- Random Forest should significantly outperform Logistic Regression — genre is a non-linear problem
+- Hip-Hop/R&B and Electronic should be the easiest genres to identify (very distinct sound profiles)
+- Classical vs. Jazz/Blues might be the hardest (both acoustic, low energy, often instrumental)
+- Baseline random-chance accuracy for a 6-class balanced problem = **16.7%** — both models should far exceed this
+
+---
+
+## Notebook 02 — `02_popularity_prediction.ipynb`
+### "Can audio features predict whether a song will be popular?"
+
+**Research Questions:**
+1. Can audio features predict whether a song is globally popular?
+2. Can audio features predict whether a song is popular *within its own genre*?
+3. Do the same features drive both, or does genre context change what matters?
+
+**What it loads:** `df_popularity_stratified.csv` (the stratified popularity dataset from Notebook 00)
+
+**Two targets (this is the key twist):**
+- `y_global` — Low / Mid / High based on fixed score thresholds (same cutoff for every genre)
+- `y_genre` — Low / Mid / High based on where the song ranks *within its genre* (a Classical song at 30 = High; a Pop song at 30 = Mid)
+
+Both targets use the same 12 audio features and the same train/test split.
+
+### The models
+
+**Baseline classifiers** (tested on both targets):
+
+| Model | What it does |
+|-------|-------------|
+| KNN (k=5) | Finds the 5 most similar songs in the training set and takes a majority vote |
+| Decision Tree | Learns a series of yes/no questions about audio features to split songs into classes |
+| Naive Bayes | Uses probability — assumes each feature independently contributes to the class |
+
+Each baseline runs through the `evaluate()` function which:
+1. Fits the model
+2. Runs **10-fold cross-validation** on the training data and prints `CV Accuracy: 0.XX (+/- 0.XX)`
+3. Prints a full classification report on the test set
+4. Shows a confusion matrix
+
+**Neural Network — PyTorch MLP**
+A small neural network with 3 hidden layers (128 → 64 → 32 neurons). More powerful than the baselines but also more complex:
+- Trained for 60 epochs with the Adam optimizer
+- Uses BatchNorm and Dropout to prevent overfitting
+- Learning rate decays every 20 epochs (StepLR)
+- Trained and evaluated separately for both targets
+
+### What we report
+- CV accuracy + test accuracy for all 4 models × 2 targets = 8 evaluations
+- Side-by-side comparison chart of all models on both targets
+- MLP learning curves (accuracy over training epochs)
+- Final summary table: Accuracy, Macro F1, Weighted F1 for each
+
+### What we expect to find
+- Audio features are a **weak predictor** of global popularity (the EDA showed correlations near zero)
+- Genre-relative labels might be slightly easier — you're comparing apples to apples within each genre
+- Non-linear models (DT, MLP) should outperform Naive Bayes
+- If genre-relative accuracy is meaningfully higher than global accuracy → audio features carry genre-context signal
+- If they're similar → audio features alone don't capture what makes a song stand out in its genre
+
+---
+
+## How to run it
+
+Run the notebooks **in order**:
+
+```
+00_data_setup.ipynb  →  creates the two CSV files on Drive
+01_genre_classification.ipynb  →  reads df_genre_balanced.csv
+02_popularity_prediction.ipynb  →  reads df_popularity_stratified.csv
+```
+
+All three notebooks mount Google Drive at the top. The shared Drive folder is:
+`My Drive / data-mining-spotify-team3 / cleanedData /`
+
+You only need to re-run `00` if you change the data (genre merges, year cutoff, sample sizes). For modeling experiments, just re-run `01` or `02` directly.
+
+---
+
+## Quick reference — shared constants
+
+| Constant | Value | Meaning |
+|----------|-------|---------|
+| `SEED` | 42 | Random seed — keeps results reproducible |
+| `YEAR_CUTOFF` | 2000 | Drop songs before this year |
+| `DRIVE_DATA_PATH` | `.../cleanedData` | Where CSVs are saved/loaded |
+| `AUDIO_FEATURES` | 10 features | Continuous audio measurements |
+| `KEY_FEATURES` | key, mode | Musical key (not very useful — included for completeness) |
+| `ALL_FEATURES` | 12 total | Everything fed to the models |
+| `LABEL_MAP` | Low=0, Mid=1, High=2 | Converts text class labels to numbers for the models |

@@ -3,10 +3,7 @@ data/
 *.csv
 
 # PDFs / Docs
-CISC4631SyllabusSpring26.pdf
-CS4631FinalProject.pdf
-FinalCheckList.pdf
-Report.pdf
+files
 
 # Python
 .venv/

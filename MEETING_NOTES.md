@@ -64,8 +64,8 @@ We keep only songs from **2000 onward**. Spotify's popularity score is based on 
 
 **6. Export Dataset A — for genre classification**
 - Keep all 7 genres including Rock
-- Sample each genre down to the **minimum-genre count** (~9,396 songs = all of Classical after the year filter). Gives a perfectly-balanced dataset of ~65.7k total songs. No arbitrary cap — every class contributes its maximum available signal.
-- Save as `df_genre_balanced.csv` → used by Notebook 01
+- Take up to **5,000 songs per genre** (randomly sampled) — all 7 genres contribute equally without Rock's volume overwhelming the classifier. Total: **35,000 rows**.
+- Save as `df_genre_balanced.csv` → used by Notebooks 01 and 03
 
 **7. Export Dataset B — for popularity prediction**
 - Assign each song a **global popularity class**: Low (score ≤ 20), Mid (21–45), High (≥ 46)
@@ -179,20 +179,77 @@ A small neural network with 3 hidden layers (128 → 64 → 32 neurons). More po
 
 ---
 
+## Notebook 03 — `03_recommendation_system.ipynb`
+### "Can audio features recommend similar songs?"
+
+**Research Question:** Given a query song, can a recommender find other songs with genuinely similar audio — without any listening history?
+
+**What it loads:** `df_genre_balanced.csv` (the balanced 7-genre dataset from Notebook 00)
+
+**The approach:** Content-based filtering using cosine similarity on audio features, implemented with scikit-learn `NearestNeighbors`. Three versions compare different design choices.
+
+### The three versions
+
+**V1 — Baseline**
+- 12 audio features (including `key`, `mode`)
+- StandardScaler + cosine similarity, single-stage k-NN
+
+**V2 — Improved Audio**
+- **Feature selection:** drop `key` and `mode` (MI < 0.03 against genre — essentially noise)
+- **Attribute transformation:** log-transform `tempo` and `duration_ms` to fix right-skew
+- Same cosine similarity, still single-stage
+
+**V3 — Hybrid (cross-notebook)**
+- V2's retrieval (top-50 audio-similar candidates) **+ Notebook 01's Random Forest as a re-ranker**
+- Two-stage retrieve-and-rerank: score each candidate as `α × audio_similarity + (1−α) × (RF-predicted genre matches query)`, then return top-10
+- Default α = 0.5 (classifier match dominates within the candidate pool)
+- Standard recommender-systems architecture (used by YouTube, search ranking, etc.)
+
+### Evaluation metrics — three, complementary
+
+- **Same-genre rate @10** — fraction of top-10 recommendations matching the query's genre. Primary metric. Random baseline = 14.3% (1/7).
+- **Intra-list diversity** — mean pairwise distance among the top-10 recommendations. Higher = less repetitive.
+- **Catalog coverage** — fraction of the 35k catalog that ever appears in any top-10 across 500 queries. Higher = less "popularity magnet."
+
+### What we found
+
+| Version | Same-Genre Rate | Diversity | Coverage | Change from V1 |
+|---------|----------------|-----------|----------|----------------|
+| V1 — baseline | 33.7% | 1.61 | 13.1% | — |
+| V2 — improved audio | 33.9% | 2.27 | 13.1% | +0.2pp sgr, +41% diversity |
+| **V3 — hybrid (α=0.5)** | **44.2%** | **2.33** | 13.0% | **+10.5pp sgr, +45% diversity** |
+
+- **V1 → V2:** preprocessing barely moves same-genre rate (33-34% appears to be a real audio-feature ceiling) but substantially improves diversity.
+- **V2 → V3:** Notebook 01's classifier as a re-ranker adds a real **+10.3pp** on same-genre rate while preserving diversity and coverage.
+- **All three versions beat the 14.3% random baseline by 2.4–3.1×.**
+
+### Honest caveats
+
+- Same-genre rate is partially circular as a V3 metric (re-rank by predicted genre, evaluate on true genre — which correlate). Diversity and coverage remain clean across all three versions.
+- V3's ceiling is bounded by the RF re-ranker's ~51% test accuracy. A stronger classifier would improve V3.
+
+### Class-topic grounding
+
+- **V1, V2:** Topic 2 — Data Processing and Feature Selection (distance measures, feature selection, attribute transformation)
+- **V3:** Topic 5 — Classification (Random Forest, ensemble methods) + retrieve-and-rerank architecture
+
+---
+
 ## How to run it
 
 Run the notebooks **in order**:
 
 ```
-00_data_setup.ipynb  →  creates the two CSV files on Drive
-01_genre_classification.ipynb  →  reads df_genre_balanced.csv
-02_popularity_prediction.ipynb  →  reads df_popularity_stratified.csv
+00_data_setup.ipynb               →  creates the two CSV files on Drive
+01_genre_classification.ipynb     →  reads df_genre_balanced.csv
+02_popularity_prediction.ipynb    →  reads df_popularity_stratified.csv
+03_recommendation_system.ipynb    →  reads df_genre_balanced.csv; uses Nb 01's RF as re-ranker
 ```
 
-All three notebooks mount Google Drive at the top. The shared Drive folder is:
+All four notebooks mount Google Drive at the top. The shared Drive folder is:
 `My Drive / data-mining-spotify-team3 / cleanedData /`
 
-You only need to re-run `00` if you change the data (genre merges, year cutoff, sample sizes). For modeling experiments, just re-run `01` or `02` directly.
+You only need to re-run `00` if you change the data (genre merges, year cutoff, sample sizes). For modeling experiments, just re-run `01`, `02`, or `03` directly.
 
 ---
 

@@ -64,7 +64,7 @@ We keep only songs from **2000 onward**. Spotify's popularity score is based on 
 
 **6. Export Dataset A — for genre classification**
 - Keep all 7 genres including Rock
-- Cap each genre at **5,000 songs** (random sample). Rock gets sampled down from ~195k to 5k — this balances classes without discarding an entire sound profile.
+- Sample each genre down to the **minimum-genre count** (~9,396 songs = all of Classical after the year filter). Gives a perfectly-balanced dataset of ~65.7k total songs. No arbitrary cap — every class contributes its maximum available signal.
 - Save as `df_genre_balanced.csv` → used by Notebook 01
 
 **7. Export Dataset B — for popularity prediction**

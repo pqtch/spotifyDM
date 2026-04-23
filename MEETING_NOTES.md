@@ -12,7 +12,7 @@
 
 We have a dataset of **550,000 Spotify songs** with audio measurements for each song (how danceable it is, how loud, how fast, etc.) plus a popularity score from 0–100. The project asks: **can a computer learn patterns in those audio measurements well enough to predict genre or popularity?**
 
-We split the work into three notebooks that run in order.
+We split the work into four notebooks that run in order.
 
 ---
 

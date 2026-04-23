@@ -1,5 +1,10 @@
 # Spotify Data Mining — Project Briefing
-**CISC 4631 | Group 3 | Updated 2026-04-14**
+**CISC 4631 | Group 3 | Updated 2026-04-22**
+
+> **Post-third-round-meeting update (2026-04-22):** pipeline revised per Yanjun's feedback —
+> Rock restored via random sampling (not dropped), all notebooks now use a 60/20/20 train/eval/test
+> split, mutual-information feature selection added, and a class-balance check with conditional
+> SMOTE added to Nb 02. See `THIRD_ROUND_MEETING.md` for the meeting record.
 
 ---
 
@@ -58,8 +63,8 @@ Nine sections of exploration on the songs:
 We keep only songs from **2000 onward**. Spotify's popularity score is based on recent streaming activity, so pre-2000 songs are systematically underscored — not because they're bad, but because fewer people stream them today.
 
 **6. Export Dataset A — for genre classification**
-- Drop Rock (it's 35% of the data; keeping it would overwhelm the classifier)
-- Take up to **5,000 songs per genre** (randomly sampled) so no genre dominates
+- Keep all 7 genres including Rock
+- Cap each genre at **5,000 songs** (random sample). Rock gets sampled down from ~195k to 5k — this balances classes without discarding an entire sound profile.
 - Save as `df_genre_balanced.csv` → used by Notebook 01
 
 **7. Export Dataset B — for popularity prediction**
@@ -75,12 +80,17 @@ We keep only songs from **2000 onward**. Spotify's popularity score is based on 
 
 **Research Question:** If I give a computer the audio measurements of a song — but don't tell it the genre — can it figure out what genre it is?
 
-**What it loads:** `df_genre_balanced.csv` (the balanced 6-genre dataset from Notebook 00)
+**What it loads:** `df_genre_balanced.csv` (the balanced 7-genre dataset from Notebook 00)
 
-**The features:** The 12 audio measurements we feed the model:
+**The features:** We start with the 12 audio measurements:
 `danceability, energy, loudness, speechiness, acousticness, instrumentalness, liveness, valence, tempo, duration_ms, key, mode`
 
-**The split:** 80% of songs go to training (the model learns from these), 20% go to testing (the model has never seen these — we use them to grade it).
+**Feature selection:** Mutual information (computed on the training set only) ranks each feature's non-linear dependence with genre. Bottom-scoring features are dropped — typically `key` and `mode`, which contribute almost nothing. `K` is a tunable knob in the notebook.
+
+**The split:** 60/20/20 train/eval/test, stratified by genre.
+- **Train (60%)** — the model fits on this, plus 10-fold cross-validation for stability estimates.
+- **Eval (20%)** — held out during training; used for model comparison and hyperparameter decisions.
+- **Test (20%)** — touched exactly once at the end for the final reported numbers. Never used for tuning.
 
 ### The two models
 
@@ -107,7 +117,7 @@ We keep only songs from **2000 onward**. Spotify's popularity score is based on 
 - Random Forest should significantly outperform Logistic Regression — genre is a non-linear problem
 - Hip-Hop/R&B and Electronic should be the easiest genres to identify (very distinct sound profiles)
 - Classical vs. Jazz/Blues might be the hardest (both acoustic, low energy, often instrumental)
-- Baseline random-chance accuracy for a 6-class balanced problem = **16.7%** — both models should far exceed this
+- Baseline random-chance accuracy for a 7-class balanced problem = **14.3%** — both models should far exceed this
 
 ---
 
@@ -125,7 +135,11 @@ We keep only songs from **2000 onward**. Spotify's popularity score is based on 
 - `y_global` — Low / Mid / High based on fixed score thresholds (same cutoff for every genre)
 - `y_genre` — Low / Mid / High based on where the song ranks *within its genre* (a Classical song at 30 = High; a Pop song at 30 = Mid)
 
-Both targets use the same 12 audio features and the same train/test split.
+Both targets use the same selected features and the same 60/20/20 train/eval/test split, stratified on the global label.
+
+**Class balance check + SMOTE:** After splitting, we check the imbalance ratio (max class count / min class count) of each target. If it exceeds 1.5×, we apply SMOTE on the training set only (never on eval/test). In practice, Nb 00's stratified sampling usually keeps classes balanced, so SMOTE won't fire — but we run the check so we can show Yanjun we verified.
+
+**Feature selection:** Mutual information against the primary target (`y_global`) on train only. Same selected features are used for both targets and all models.
 
 ### The models
 

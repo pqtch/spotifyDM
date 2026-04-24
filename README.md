@@ -96,10 +96,10 @@ Per-class F1 (XGBoost): Rock 0.64, Electronic 0.62, Hip-Hop/R&B 0.61, Classical 
 |---|---|---|---|
 | V1 baseline | 34.7% | 1.59 | 9.8% |
 | V2 improved audio (drop key/mode + log-transform) | 34.8% | 2.30 | 9.8% |
-| **V3 hybrid (+ Nb 01 genre classifier)** | **45.6%** | 2.34 | 9.8% |
-| V4 hybrid (+ Nb 02 popularity classifier) | 43.1% | 2.35 | 9.7% |
+| **V3 hybrid (+ Nb 01 genre classifier)** | **46.3%** | 2.34 | 9.7% |
+| V4 hybrid (+ Nb 02 popularity classifier) | 43.4% | 2.34 | 9.7% |
 
-**V3 → V4 is −2.5pp.** V4 is intentionally shown as worse — see "Design decisions" #6 below.
+**V3 → V4 is −2.9pp.** V4 is intentionally shown as worse — see "Design decisions" #6 below.
 
 ---
 
